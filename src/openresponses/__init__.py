@@ -43,7 +43,7 @@ from .websocket import (
 )
 
 OPENRESPONSES_SPEC_VERSION = "2026-04-24"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "OPENRESPONSES_SPEC_VERSION",

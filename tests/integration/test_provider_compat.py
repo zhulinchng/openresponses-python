@@ -69,6 +69,30 @@ def test_openai_compatibility_mode_accepts_documented_provider_shape(
     content = output[0]["content"]
     assert isinstance(content, list)
     assert result.output[0].content[0].text == content[0]["text"]
+    assert result.output_text == content[0]["text"]
+    client.close()
+
+
+def test_compatibility_mode_defaults_missing_function_tool_strictness() -> None:
+    payload = {
+        **VLLM_RESPONSE,
+        "tools": [
+            {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get weather",
+                "parameters": {"type": "object", "properties": {}},
+            }
+        ],
+    }
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
+    client = OpenResponses(
+        base_url="http://test",
+        response_compatibility="openai-compatible",
+        http_client=httpx.Client(transport=transport),
+    )
+    result = client.responses.create({"model": "local", "input": "Hello"})
+    assert result.tools[0].strict is False
     client.close()
 
 

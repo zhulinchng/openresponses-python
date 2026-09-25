@@ -106,6 +106,39 @@ def test_compatibility_stream_defaults_provider_output_index() -> None:
     client.close()
 
 
+def test_compatibility_stream_defaults_function_argument_output_index() -> None:
+    body = b"".join(
+        b"data: " + json.dumps(event).encode() + b"\n\n"
+        for event in (
+            {"type": "response.created", "response": response_payload()},
+            {
+                "type": "response.function_call_arguments.delta",
+                "item_id": "fc_1",
+                "delta": '{"city":"Paris"}',
+            },
+            {
+                "type": "response.function_call_arguments.done",
+                "item_id": "fc_1",
+                "arguments": '{"city":"Paris"}',
+            },
+            {"type": "response.completed", "response": response_payload()},
+        )
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=body
+        )
+    )
+    client = OpenResponses(
+        base_url="http://test",
+        response_compatibility="openai-compatible",
+        http_client=httpx.Client(transport=transport),
+    )
+    events = list(client.responses.create(CreateResponseRequest(model="m", stream=True)))
+    assert [event.output_index for event in events[1:3]] == [0, 0]
+    client.close()
+
+
 def test_strict_stream_still_requires_event_sequence_number() -> None:
     event = {"type": "response.completed", "response": response_payload()}
     body = f"data: {json.dumps(event)}\n\ndata: [DONE]\n\n".encode()

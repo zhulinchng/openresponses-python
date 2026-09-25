@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from pydantic import Field
@@ -23,8 +23,6 @@ from .errors import (
 from .types.base import OpenResponsesModel
 from .types.generated import (
     AllowedToolChoice,
-    Error1,
-    FunctionTool,
     FunctionToolChoice,
     IncompleteDetails,
     TextField,
@@ -98,6 +96,13 @@ def _validate_response_payload(
     normalized = dict(payload)
     if "created_at" not in normalized and "created" in normalized:
         normalized["created_at"] = normalized["created"]
+    if compatibility == "openai-compatible" and isinstance(normalized.get("tools"), list):
+        tools: list[Any] = []
+        for tool in normalized["tools"]:
+            if isinstance(tool, dict):
+                tool = {"strict": False, **tool}
+            tools.append(tool)
+        normalized["tools"] = tools
     if expected_object == "response.compaction" or compatibility != "openai-compatible":
         return model.model_validate(normalized)
     return OpenAICompatibleResponse.model_validate(normalized)
@@ -202,6 +207,14 @@ class CompatibleItem(OpenResponsesModel):
     summary: list[CompatibleContent] | None = None
 
 
+class CompatibleFunctionTool(OpenResponsesModel):
+    type: Literal["function"]
+    name: str
+    description: str | None = None
+    parameters: dict[str, Any] | None = None
+    strict: bool = False
+
+
 class OpenAICompatibleResponse(OpenResponsesModel):
     id: str
     object: str
@@ -213,9 +226,21 @@ class OpenAICompatibleResponse(OpenResponsesModel):
     previous_response_id: str | None = None
     instructions: str | None = None
     output: list[CompatibleItem] = Field(default_factory=list)
-    output_text: str | None = None
-    error: Error1 | None = None
-    tools: list[FunctionTool] = Field(default_factory=list)
+
+    @property
+    def output_text(self) -> str:
+        """Aggregate assistant ``output_text`` content parts."""
+
+        texts: list[str] = []
+        for item in self.output:
+            if item.type != "message" or item.content is None:
+                continue
+            for content in item.content:
+                if content.type == "output_text" and isinstance(content.text, str):
+                    texts.append(content.text)
+        return "".join(texts)
+
+    tools: list[CompatibleFunctionTool] = Field(default_factory=list)
     tool_choice: FunctionToolChoice | ToolChoiceValueEnum | AllowedToolChoice | str | None = None
     truncation: TruncationEnum | None = None
     parallel_tool_calls: bool | None = None

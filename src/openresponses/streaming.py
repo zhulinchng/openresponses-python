@@ -192,12 +192,15 @@ class StreamState:
 def _compatible_response_payload(value: Any) -> dict[str, Any]:
     from .serialization import OpenAICompatibleResponse
 
-    if not isinstance(value, dict):
-        raise SSEProtocolError("compatible response snapshot must be an object")
-    response = OpenAICompatibleResponse.model_validate(value).model_dump(
+    normalized = dict(value)
+    if isinstance(normalized.get("tools"), list):
+        normalized["tools"] = [
+            {"strict": False, **tool} if isinstance(tool, dict) else tool
+            for tool in normalized["tools"]
+        ]
+    response = OpenAICompatibleResponse.model_validate(normalized).model_dump(
         mode="python", by_alias=True, exclude_none=True
     )
-    response["created_at"] = value.get("created_at", value.get("created", 0))
     if isinstance(response.get("usage"), dict):
         response["usage"].setdefault("input_tokens_details", {"cached_tokens": 0})
         response["usage"].setdefault("output_tokens_details", {"reasoning_tokens": 0})
@@ -274,6 +277,8 @@ def _decode_event(
     if response_compatibility == "openai-compatible" and payload.get("type") in {
         "response.output_item.added",
         "response.output_item.done",
+        "response.function_call_arguments.delta",
+        "response.function_call_arguments.done",
     }:
         payload = {"output_index": 0, **payload}
     if response_compatibility == "openai-compatible" and "response" in payload:
