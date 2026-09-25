@@ -4,7 +4,7 @@ The package is published from GitHub Actions using PyPI Trusted Publishing (OIDC
 
 ## One-time PyPI setup
 
-1. Create the `openresponses` project on PyPI if it does not already exist.
+1. Create the `openresponses-py` project on PyPI if it does not already exist.
 2. Add a Trusted Publisher for this GitHub repository:
    - Owner: `zhulinchng`
    - Repository: `openresponses-python`

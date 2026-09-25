@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/openresponses
+      url: https://pypi.org/p/openresponses-py
     permissions:
       id-token: write
     steps:

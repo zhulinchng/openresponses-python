@@ -7,7 +7,7 @@ A typed Python client for the [OpenResponses](https://github.com/openresponses/o
 Python 3.10 or newer is required.
 
 ```bash
-python -m pip install openresponses
+python -m pip install openresponses-py
 ```
 
 For a checkout of this repository:

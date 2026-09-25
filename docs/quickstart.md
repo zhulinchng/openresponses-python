@@ -3,7 +3,7 @@
 The SDK targets Python 3.10+ and the immutable OpenResponses `2026-04-24` release. Install it from a package index or a checkout:
 
 ```bash
-python -m pip install openresponses
+python -m pip install openresponses-py
 # or, from this repository:
 python -m pip install -e .
 ```
