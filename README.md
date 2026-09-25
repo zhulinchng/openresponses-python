@@ -127,7 +127,7 @@ For Ollama, vLLM, llama.cpp, LM Studio, SGLang, and other partial OpenAI-compati
 
 ## Documentation
 
-Read the hosted documentation at [openresponses-python.readthedocs](https://zhulinchng.github.io/openresponses-python/) or locally with `python -m mkdocs serve`.
+Read the hosted documentation at [OpenResponses Python documentation](https://zhulinchng.github.io/openresponses-python/) or locally with `python -m mkdocs serve`.
 
 The site covers the [quickstart](docs/quickstart.md), [typed protocol models](docs/protocol.md), [SSE streaming](docs/streaming.md), [WebSocket turns](docs/websocket.md), and [provider compatibility](docs/compatibility.md). Runnable examples live in [`examples/`](examples/).
 
