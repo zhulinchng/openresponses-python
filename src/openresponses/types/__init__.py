@@ -5,6 +5,18 @@ for _name in dir(_generated):
     if not _name.startswith("_"):
         globals()[_name] = getattr(_generated, _name)
 
+from .openai import (
+    OpenAIAccessPrograms,
+    OpenAICompactedResponse,
+    OpenAICompactRequest,
+    OpenAIContextManagement,
+    OpenAIRequest,
+    OpenAIResponse,
+    OpenAIResponseItem,
+    OpenAIStreamingEvent,
+    OpenAIWebSocketError,
+    OpenAIWebSocketRequest,
+)
 from .protocol import (
     CompactResponseRequest,
     CreateResponseRequest,

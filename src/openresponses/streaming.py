@@ -11,6 +11,7 @@ import httpx
 
 from .errors import APIConnectionError, APITimeoutError, SSEProtocolError
 from .types.generated import ResponseResource
+from .types.openai import OpenAIResponse, OpenAIStreamingEvent
 from .types.protocol import StreamingEventAdapter
 
 
@@ -112,7 +113,7 @@ class SSEParser:
 @dataclass
 class StreamState:
     last_sequence_number: int | None = None
-    final_response: ResponseResource | None = None
+    final_response: ResponseResource | OpenAIResponse | None = None
     terminal_seen: bool = False
     saw_error: bool = False
     item_done: set[int] = field(default_factory=set)
@@ -120,6 +121,7 @@ class StreamState:
     item_added: set[int] = field(default_factory=set)
     content_added: set[tuple[int, int]] = field(default_factory=set)
     error_pending: bool = False
+    openai: bool = False
 
     def accept(self, event: Any) -> Any:
         if self.terminal_seen:
@@ -130,6 +132,16 @@ class StreamState:
                 raise SSEProtocolError("event sequence_number must strictly increase")
             self.last_sequence_number = sequence
         event_type = event.type
+        if self.openai and sequence is None:
+            raise SSEProtocolError("OpenAI streaming event requires sequence_number")
+        if self.openai:
+            if event_type == "error":
+                self.saw_error = True
+                self.terminal_seen = True
+            elif event_type in {"response.completed", "response.failed", "response.incomplete"}:
+                self.terminal_seen = True
+                self.final_response = event.response
+            return event
         if self.error_pending and event_type != "response.failed":
             raise SSEProtocolError("error event must be followed by response.failed")
         output_index = getattr(event, "output_index", None)
@@ -248,6 +260,11 @@ def _decode_event(
         raise SSEProtocolError("SSE event payload requires a string type")
     if parsed.event is not None and parsed.event != payload["type"]:
         raise SSEProtocolError("SSE event name does not match payload type")
+    if response_compatibility == "openai":
+        try:
+            return OpenAIStreamingEvent.model_validate(payload)
+        except Exception as exc:
+            raise SSEProtocolError(f"invalid OpenAI streaming event: {exc}") from exc
     if (
         response_compatibility == "openai-compatible"
         and "sequence_number" not in payload
@@ -281,7 +298,7 @@ class _StreamBase:
         self._response_compatibility = response_compatibility
         self._max_response_bytes = max_response_bytes
         self._response_context: Any = None
-        self._state = StreamState()
+        self._state = StreamState(openai=response_compatibility == "openai")
         self._closed = False
         self._finished = False
         self._parser: SSEParser | None = None
@@ -289,7 +306,7 @@ class _StreamBase:
         self._pending: list[ParsedSSEEvent] = []
 
     @property
-    def final_response(self) -> ResponseResource | None:
+    def final_response(self) -> ResponseResource | OpenAIResponse | None:
         return self._state.final_response
 
     @property
@@ -318,7 +335,10 @@ class _StreamBase:
         )
 
     def _finish_check(self) -> None:
-        if self._response_compatibility == "openai-compatible" and self._state.terminal_seen:
+        if (
+            self._response_compatibility in {"openai-compatible", "openai"}
+            and self._state.terminal_seen
+        ):
             self._finished = True
             return
         if not self._finished or not self._state.terminal_seen:

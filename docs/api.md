@@ -46,6 +46,12 @@ Use `model_dump(mode="json", by_alias=True)` to serialize Python models to the w
 
 `SSEParser` is exported for reusable incremental SSE framing. The high-level streams add content-type, event-model, sequence, and lifecycle validation.
 
+## OpenAI and MLflow integrations
+
+Use `response_compatibility="openai"` with `OpenAIRequest`, `OpenAICompactRequest`, and `OpenAIWebSocketRequest` for the current OpenAI Responses API. This explicit mode preserves current OpenAI fields without changing strict OpenResponses validation.
+
+MLflow support is optional through `openresponses.integrations.MLflowOpenResponses` and `MLflowAsyncOpenResponses`. Install `openresponses-py[mlflow]` to enable it. The wrapper traces JSON, compact, and streaming response calls; WebSocket turns remain available through the wrapped client's `websocket()` method.
+
 ## Errors
 
 All errors inherit from `OpenResponsesError`:

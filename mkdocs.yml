@@ -66,6 +66,7 @@ nav:
   - Core concepts:
       - Protocol models: protocol.md
       - Provider compatibility: compatibility.md
+      - OpenAI and MLflow: compatibility.md
   - Transports:
       - Server-sent events: streaming.md
       - WebSockets: websocket.md

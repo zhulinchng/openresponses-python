@@ -17,6 +17,7 @@ from .config import ClientConfig, WebSocketConfig
 from .errors import SSEProtocolError, WebSocketError
 from .streaming import StreamState
 from .types.generated import WebSocketErrorEvent
+from .types.openai import OpenAIWebSocketRequest
 from .types.protocol import (
     CreateResponseRequest,
     StreamingEventAdapter,
@@ -47,14 +48,27 @@ def _forbidden_present(request: Any) -> set[str]:
 
 
 def _coerce_request(
-    request: WebSocketResponseCreateRequest | CreateResponseRequest | Mapping[str, Any],
-) -> WebSocketResponseCreateRequest:
+    request: WebSocketResponseCreateRequest
+    | CreateResponseRequest
+    | OpenAIWebSocketRequest
+    | Mapping[str, Any],
+    *,
+    openai: bool = False,
+) -> WebSocketResponseCreateRequest | OpenAIWebSocketRequest:
     forbidden = _forbidden_present(request)
     if forbidden:
         raise WebSocketError(
             "WebSocket response.create cannot include " + ", ".join(sorted(forbidden))
         )
     try:
+        if openai:
+            if isinstance(request, OpenAIWebSocketRequest):
+                return request
+            if isinstance(request, (WebSocketResponseCreateRequest, CreateResponseRequest)):
+                return OpenAIWebSocketRequest.model_validate(
+                    request.model_dump(mode="python", by_alias=True, exclude_unset=True)
+                )
+            return OpenAIWebSocketRequest.model_validate(request)
         if isinstance(request, WebSocketResponseCreateRequest):
             return request
         if isinstance(request, CreateResponseRequest):
@@ -93,9 +107,19 @@ def _close_details(exc: ConnectionClosed) -> tuple[int | None, str | None]:
     return code, reason
 
 
-def _envelope_or_event(payload: dict[str, Any]) -> Any:
-    # Responses WebSocket errors have an HTTP-style ``status`` field. A
-    # regular streaming error event instead has ``sequence_number``.
+def _envelope_or_event(payload: dict[str, Any], *, openai: bool = False) -> Any:
+    if openai:
+        from .types.openai import OpenAIStreamingEvent, OpenAIWebSocketError
+
+        if payload.get("type") == "error":
+            try:
+                return OpenAIWebSocketError.model_validate(payload)
+            except Exception as exc:
+                raise WebSocketError(f"invalid OpenAI WebSocket error event: {exc}") from exc
+        try:
+            return OpenAIStreamingEvent.model_validate(payload)
+        except Exception as exc:
+            raise WebSocketError(f"invalid OpenAI WebSocket streaming event: {exc}") from exc
     if payload.get("type") == "error" and "status" in payload and "sequence_number" not in payload:
         try:
             return WebSocketErrorEvent.model_validate(payload)
@@ -113,10 +137,11 @@ class _TurnState:
     ) -> None:
         self._connection = connection
         self._generation = generation
-        self._state = StreamState()
+        self._openai = connection._config.response_compatibility == "openai"
+        self._state = StreamState(openai=self._openai)
         self._finished = False
         self._closed = False
-        self.error: WebSocketErrorEvent | None = None
+        self.error: Any | None = None
         self.final_response: Any | None = None
 
     @property
@@ -144,8 +169,8 @@ class _TurnState:
     def event(self, payload: dict[str, Any]) -> Any | None:
         if self._finished:
             raise WebSocketError("WebSocket turn has already ended")
-        item = _envelope_or_event(payload)
-        if isinstance(item, WebSocketErrorEvent):
+        item = _envelope_or_event(payload, openai=self._openai)
+        if isinstance(item, WebSocketErrorEvent) or item.type == "error":
             self.error = item
             self._finished = True
             self._release()
@@ -358,13 +383,17 @@ class WebSocketConnection:
         self.close()
 
     def create(
-        self, request: WebSocketResponseCreateRequest | CreateResponseRequest | Mapping[str, Any]
+        self,
+        request: WebSocketResponseCreateRequest
+        | CreateResponseRequest
+        | OpenAIWebSocketRequest
+        | Mapping[str, Any],
     ) -> WebSocketTurn:
         if self._ws is None:
             raise WebSocketError("WebSocket connection is not open")
         if self._active_turn is not None:
             raise WebSocketError("WebSocket connection already has an in-flight turn")
-        payload = _coerce_request(request)
+        payload = _coerce_request(request, openai=self._config.response_compatibility == "openai")
         turn = WebSocketTurn(self)
         self._active_turn = turn._state
         try:
@@ -458,13 +487,17 @@ class AsyncWebSocketConnection:
         await self.close()
 
     async def create(
-        self, request: WebSocketResponseCreateRequest | CreateResponseRequest | Mapping[str, Any]
+        self,
+        request: WebSocketResponseCreateRequest
+        | CreateResponseRequest
+        | OpenAIWebSocketRequest
+        | Mapping[str, Any],
     ) -> AsyncWebSocketTurn:
         if self._ws is None:
             raise WebSocketError("WebSocket connection is not open")
         if self._active_turn is not None:
             raise WebSocketError("WebSocket connection already has an in-flight turn")
-        payload = _coerce_request(request)
+        payload = _coerce_request(request, openai=self._config.response_compatibility == "openai")
         turn = AsyncWebSocketTurn(self)
         self._active_turn = turn._state
         try:

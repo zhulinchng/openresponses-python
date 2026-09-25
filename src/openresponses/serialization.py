@@ -31,6 +31,7 @@ from .types.generated import (
     ToolChoiceValueEnum,
     TruncationEnum,
 )
+from .types.openai import OpenAICompactedResponse, OpenAIResponse
 
 
 def model_json(value: Any) -> Any:
@@ -77,6 +78,15 @@ def _validate_response_payload(
     expected_object = "response.compaction" if model.__name__ == "CompactResource" else "response"
     if compatibility == "strict":
         return model.model_validate(payload)
+    if compatibility == "openai":
+        if object_type != expected_object:
+            raise APIResponseValidationError(
+                f"provider response object must be {expected_object!r}, got {object_type!r}"
+            )
+        target = (
+            OpenAICompactedResponse if expected_object == "response.compaction" else OpenAIResponse
+        )
+        return target.model_validate(payload)
     if object_type != expected_object:
         raise APIResponseValidationError(
             f"provider response object must be {expected_object!r}, got {object_type!r}"

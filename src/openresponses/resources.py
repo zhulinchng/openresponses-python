@@ -10,21 +10,53 @@ from .errors import APIConnectionError, APITimeoutError
 from .serialization import OpenAICompatibleResponse, parse_json_response, request_json, status_error
 from .streaming import AsyncResponseStream, ResponseStream
 from .types.generated import CompactResource, ResponseResource
+from .types.openai import (
+    OpenAICompactedResponse,
+    OpenAICompactRequest,
+    OpenAIRequest,
+    OpenAIResponse,
+)
 from .types.protocol import CompactResponseRequest, CreateResponseRequest
 
 
 class _Payloads:
-    def _payload(self, request: CreateResponseRequest | Mapping[str, Any]) -> dict[str, Any]:
-        if isinstance(request, CreateResponseRequest):
+    def _payload(
+        self,
+        request: CreateResponseRequest | OpenAIRequest | Mapping[str, Any],
+        *,
+        openai: bool,
+    ) -> dict[str, Any]:
+        if isinstance(request, OpenAIRequest):
             return request_json(request)
-        return request_json(CreateResponseRequest.model_validate(request))
+        if isinstance(request, CreateResponseRequest):
+            if openai:
+                return request_json(
+                    OpenAIRequest.model_validate(
+                        request.model_dump(mode="python", by_alias=True, exclude_unset=True)
+                    )
+                )
+            return request_json(request)
+        model = OpenAIRequest if openai else CreateResponseRequest
+        return request_json(model.model_validate(request))
 
     def _compact_payload(
-        self, request: CompactResponseRequest | Mapping[str, Any]
+        self,
+        request: CompactResponseRequest | OpenAICompactRequest | Mapping[str, Any],
+        *,
+        openai: bool,
     ) -> dict[str, Any]:
-        if isinstance(request, CompactResponseRequest):
+        if isinstance(request, OpenAICompactRequest):
             return request_json(request)
-        return request_json(CompactResponseRequest.model_validate(request))
+        if isinstance(request, CompactResponseRequest):
+            if openai:
+                return request_json(
+                    OpenAICompactRequest.model_validate(
+                        request.model_dump(mode="python", by_alias=True, exclude_unset=True)
+                    )
+                )
+            return request_json(request)
+        model = OpenAICompactRequest if openai else CompactResponseRequest
+        return request_json(model.model_validate(request))
 
 
 class Responses(_Payloads):
@@ -34,12 +66,13 @@ class Responses(_Payloads):
 
     def create(
         self,
-        request: CreateResponseRequest | Mapping[str, Any],
+        request: CreateResponseRequest | OpenAIRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ResponseResource | OpenAICompatibleResponse | ResponseStream:
-        payload = self._payload(request)
+    ) -> ResponseResource | OpenAICompatibleResponse | OpenAIResponse | ResponseStream:
+        openai = self._config.response_compatibility == "openai"
+        payload = self._payload(request, openai=openai)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
         request_timeout = self._config.timeout if timeout is None else timeout
@@ -69,18 +102,19 @@ class Responses(_Payloads):
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
         return cast(
-            ResponseResource | OpenAICompatibleResponse,
+            ResponseResource | OpenAICompatibleResponse | OpenAIResponse,
             parse_json_response(response, ResponseResource, self._config),
         )
 
     def compact(
         self,
-        request: CompactResponseRequest | Mapping[str, Any],
+        request: CompactResponseRequest | OpenAICompactRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> CompactResource:
-        payload = self._compact_payload(request)
+    ) -> CompactResource | OpenAICompactedResponse:
+        openai = self._config.response_compatibility == "openai"
+        payload = self._compact_payload(request, openai=openai)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
         request_timeout = self._config.timeout if timeout is None else timeout
@@ -97,7 +131,10 @@ class Responses(_Payloads):
             raise APIConnectionError("request failed") from exc
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
-        return cast(CompactResource, parse_json_response(response, CompactResource, self._config))
+        return cast(
+            CompactResource | OpenAICompactedResponse,
+            parse_json_response(response, CompactResource, self._config),
+        )
 
 
 class AsyncResponses(_Payloads):
@@ -107,12 +144,13 @@ class AsyncResponses(_Payloads):
 
     async def create(
         self,
-        request: CreateResponseRequest | Mapping[str, Any],
+        request: CreateResponseRequest | OpenAIRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ResponseResource | OpenAICompatibleResponse | AsyncResponseStream:
-        payload = self._payload(request)
+    ) -> ResponseResource | OpenAICompatibleResponse | OpenAIResponse | AsyncResponseStream:
+        openai = self._config.response_compatibility == "openai"
+        payload = self._payload(request, openai=openai)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
         request_timeout = self._config.timeout if timeout is None else timeout
@@ -142,18 +180,19 @@ class AsyncResponses(_Payloads):
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
         return cast(
-            ResponseResource | OpenAICompatibleResponse,
+            ResponseResource | OpenAICompatibleResponse | OpenAIResponse,
             parse_json_response(response, ResponseResource, self._config),
         )
 
     async def compact(
         self,
-        request: CompactResponseRequest | Mapping[str, Any],
+        request: CompactResponseRequest | OpenAICompactRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> CompactResource:
-        payload = self._compact_payload(request)
+    ) -> CompactResource | OpenAICompactedResponse:
+        openai = self._config.response_compatibility == "openai"
+        payload = self._compact_payload(request, openai=openai)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
         request_timeout = self._config.timeout if timeout is None else timeout
@@ -170,4 +209,7 @@ class AsyncResponses(_Payloads):
             raise APIConnectionError("request failed") from exc
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
-        return cast(CompactResource, parse_json_response(response, CompactResource, self._config))
+        return cast(
+            CompactResource | OpenAICompactedResponse,
+            parse_json_response(response, CompactResource, self._config),
+        )

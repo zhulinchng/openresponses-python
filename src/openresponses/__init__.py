@@ -22,6 +22,19 @@ from .serialization import OpenAICompatibleResponse
 from .streaming import AsyncResponseStream, ResponseStream, SSEParser
 from .types import *  # noqa: F403
 from .types import __all__ as _type_exports
+from .types.generated import ResponseResource
+from .types.openai import (
+    OpenAIAccessPrograms,
+    OpenAICompactedResponse,
+    OpenAICompactRequest,
+    OpenAIContextManagement,
+    OpenAIRequest,
+    OpenAIResponse,
+    OpenAIResponseItem,
+    OpenAIStreamingEvent,
+    OpenAIWebSocketError,
+    OpenAIWebSocketRequest,
+)
 from .websocket import (
     AsyncWebSocketConnection,
     AsyncWebSocketTurn,
@@ -49,12 +62,23 @@ __all__ = [
     "InternalServerError",
     "ModelError",
     "NotFoundError",
+    "OpenAIAccessPrograms",
+    "OpenAICompactRequest",
+    "OpenAICompactedResponse",
+    "OpenAICompatibleResponse",
+    "OpenAIContextManagement",
+    "OpenAIRequest",
+    "OpenAIResponse",
+    "OpenAIResponseItem",
+    "OpenAIStreamingEvent",
+    "OpenAIWebSocketError",
+    "OpenAIWebSocketRequest",
     "OpenResponses",
     "OpenResponsesError",
     "PermissionDeniedError",
     "ProtocolError",
     "RateLimitError",
-    "OpenAICompatibleResponse",
+    "ResponseResource",
     "ResponseTooLargeError",
     "ResponseStream",
     "SSEParser",

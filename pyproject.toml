@@ -39,6 +39,7 @@ Issues = "https://github.com/zhulinchng/openresponses-python/issues"
 Documentation = "https://zhulinchng.github.io/openresponses-python/"
 
 [project.optional-dependencies]
+mlflow = ["mlflow>=3.0,<4"]
 dev = [
   "build>=1.2,<2",
   "datamodel-code-generator==0.83.0",

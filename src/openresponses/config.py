@@ -33,8 +33,8 @@ class ClientConfig:
         object.__setattr__(self, "base_url", normalize_base_url(self.base_url))
         if self.max_response_bytes <= 0:
             raise ValueError("max_response_bytes must be positive")
-        if self.response_compatibility not in {"strict", "openai-compatible"}:
-            raise ValueError("response_compatibility must be strict or openai-compatible")
+        if self.response_compatibility not in {"strict", "openai-compatible", "openai"}:
+            raise ValueError("response_compatibility must be strict, openai-compatible, or openai")
 
     @property
     def responses_url(self) -> str:
