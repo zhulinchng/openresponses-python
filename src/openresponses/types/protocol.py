@@ -238,9 +238,7 @@ class CreateResponseRequest(OpenResponsesModel):
     model: str | None = None
     input: str | list[InputItem] | None = None
     previous_response_id: str | None = None
-    include: list[Literal["reasoning.encrypted_content", "message.output_text.logprobs"]] | None = (
-        None
-    )
+    include: list[Literal["reasoning.encrypted_content", "message.output_text.logprobs"]] = None  # type: ignore[assignment]
     tools: list[ToolParam] | None = None
     tool_choice: ToolChoice | None = None
     metadata: dict[str, str] | None = Field(default=None, max_length=16)
@@ -258,10 +256,10 @@ class CreateResponseRequest(OpenResponsesModel):
     reasoning: ReasoningParam | None = None
     safety_identifier: str | None = Field(default=None, max_length=64)
     prompt_cache_key: str | None = Field(default=None, max_length=64)
-    truncation: Literal["auto", "disabled"] | None = None
+    truncation: Literal["auto", "disabled"] = None  # type: ignore[assignment]
     instructions: str | None = None
     store: bool = True
-    service_tier: Literal["auto", "default", "flex", "priority"] | None = None
+    service_tier: Literal["auto", "default", "flex", "priority"] = None  # type: ignore[assignment]
     top_logprobs: int | None = Field(default=None, ge=0, le=20)
 
     @field_validator("input")

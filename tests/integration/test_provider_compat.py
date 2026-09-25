@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import get_type_hints
+
 import httpx
 import pytest
 from pydantic import ValidationError
 
 from openresponses import APIResponseValidationError, OpenResponses
 from openresponses.errors import APIStatusError, ResponseTooLargeError
+from openresponses.resources import AsyncResponses, Responses
 from openresponses.serialization import OpenAICompatibleResponse
 from openresponses.types import ResponseResource
 
@@ -67,6 +70,13 @@ def test_openai_compatibility_mode_accepts_documented_provider_shape(
     assert isinstance(content, list)
     assert result.output[0].content[0].text == content[0]["text"]
     client.close()
+
+
+def test_create_return_annotations_include_compatibility_response() -> None:
+    for resource in (Responses.create, AsyncResponses.create):
+        return_type = get_type_hints(resource)["return"]
+        assert OpenAICompatibleResponse in getattr(return_type, "__args__", ())
+        assert ResponseResource in getattr(return_type, "__args__", ())
 
 
 def test_strict_mode_rejects_local_provider_shape() -> None:

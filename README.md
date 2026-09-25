@@ -61,7 +61,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Requests may be dictionaries or typed `CreateResponseRequest` models. Successful JSON responses are validated as `ResponseResource`; the typed model surface is re-exported from `openresponses`.
+Requests may be dictionaries or typed `CreateResponseRequest` models. Strict JSON responses are validated as `ResponseResource`; with `response_compatibility="openai-compatible"`, partial provider responses are validated as `OpenAICompatibleResponse`. The typed model surface is re-exported from `openresponses`.
 
 ## Streaming
 

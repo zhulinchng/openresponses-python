@@ -140,7 +140,6 @@ class _TurnState:
         if not self._finished:
             self._closed = True
             self._finished = True
-            self._connection._poison()
 
     def event(self, payload: dict[str, Any]) -> Any | None:
         if self._finished:
@@ -168,7 +167,6 @@ class _TurnState:
         if reason:
             detail += f", reason={reason!r}"
         self._finished = True
-        self._connection._poison()
         return WebSocketError(
             f"WebSocket closed before a terminal response ({detail})",
             code=str(code) if code is not None else None,
@@ -200,7 +198,9 @@ class WebSocketTurn(Iterator[Any]):
         return self._state.last_sequence_number
 
     def close(self) -> None:
-        self._state.close()
+        if not self._state.finished:
+            self._state.close()
+            self._connection._poison()
 
     def __iter__(self) -> WebSocketTurn:
         return self
@@ -213,7 +213,9 @@ class WebSocketTurn(Iterator[Any]):
         try:
             frame = self._connection._recv()
         except ConnectionClosed as exc:
-            raise self._state.connection_closed(exc) from exc
+            error = self._state.connection_closed(exc)
+            self._connection._poison()
+            raise error from exc
         except WebSocketError:
             self._connection._poison()
             raise
@@ -251,7 +253,9 @@ class AsyncWebSocketTurn:
         return self._state.last_sequence_number
 
     async def close(self) -> None:
-        self._state.close()
+        if not self._state.finished:
+            self._state.close()
+            await self._connection._poison()
 
     def __aiter__(self) -> AsyncWebSocketTurn:
         return self
@@ -264,17 +268,19 @@ class AsyncWebSocketTurn:
         try:
             frame = await self._connection._recv()
         except ConnectionClosed as exc:
-            raise self._state.connection_closed(exc) from exc
+            error = self._state.connection_closed(exc)
+            await self._connection._poison()
+            raise error from exc
         except asyncio.CancelledError:
-            self._connection._poison()
+            await self._connection._poison()
             raise
         except WebSocketError:
-            self._connection._poison()
+            await self._connection._poison()
             raise
         try:
             item = self._state.event(_decode_frame(frame))
         except WebSocketError:
-            self._connection._poison()
+            await self._connection._poison()
             raise
         if item is None:
             raise StopAsyncIteration
@@ -332,7 +338,10 @@ class WebSocketConnection:
             active_turn._closed = True
             active_turn._finished = True
         if ws is not None:
-            ws.close()
+            try:
+                ws.close()
+            except Exception as exc:
+                raise WebSocketError(f"could not close WebSocket connection: {exc}") from exc
 
     def __enter__(self) -> WebSocketConnection:
         return self.connect()
@@ -368,7 +377,7 @@ class WebSocketConnection:
                 )
             )
         except Exception as exc:
-            self._active_turn = None
+            self._poison()
             raise WebSocketError(f"could not send WebSocket response.create: {exc}") from exc
         return turn
 
@@ -429,7 +438,10 @@ class AsyncWebSocketConnection:
             active_turn._closed = True
             active_turn._finished = True
         if ws is not None:
-            await ws.close()
+            try:
+                await ws.close()
+            except Exception as exc:
+                raise WebSocketError(f"could not close WebSocket connection: {exc}") from exc
 
     async def __aenter__(self) -> AsyncWebSocketConnection:
         return await self.connect()
@@ -442,11 +454,8 @@ class AsyncWebSocketConnection:
     ) -> None:
         await self.close()
 
-    def _poison(self) -> None:
-        ws, self._ws = self._ws, None
-        self._active_turn = None
-        if ws is not None:
-            asyncio.create_task(ws.close())
+    async def _poison(self) -> None:
+        await self.close()
 
     async def create(
         self, request: WebSocketResponseCreateRequest | CreateResponseRequest | Mapping[str, Any]
@@ -468,10 +477,10 @@ class AsyncWebSocketConnection:
                 )
             )
         except asyncio.CancelledError:
-            self._active_turn = None
+            await self._poison()
             raise
         except Exception as exc:
-            self._active_turn = None
+            await self._poison()
             raise WebSocketError(f"could not send WebSocket response.create: {exc}") from exc
         return turn
 

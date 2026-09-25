@@ -26,6 +26,53 @@ class FailingAsyncStream(httpx.AsyncByteStream):
         pass
 
 
+def test_sync_stream_status_error_uses_configured_byte_limit() -> None:
+    from openresponses import APIStatusError
+
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            400,
+            headers={"content-type": "application/json"},
+            content=b'{"error":{"message":"a response body that is too large"}}',
+        )
+    )
+    client = OpenResponses(
+        base_url="http://test",
+        max_response_bytes=10,
+        http_client=httpx.Client(transport=transport),
+    )
+    with pytest.raises(APIStatusError) as raised:
+        list(client.responses.create(CreateResponseRequest(model="m", stream=True)))
+    assert len(raised.value.body) == 10
+    client.close()
+
+
+async def test_async_stream_status_error_uses_configured_byte_limit() -> None:
+    from openresponses import APIStatusError, AsyncOpenResponses
+
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            400,
+            headers={"content-type": "application/json"},
+            content=b'{"error":{"message":"a response body that is too large"}}',
+        )
+    )
+    client = AsyncOpenResponses(
+        base_url="http://test",
+        max_response_bytes=10,
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    with pytest.raises(APIStatusError) as raised:
+        _ = [
+            event
+            async for event in await client.responses.create(
+                CreateResponseRequest(model="m", stream=True)
+            )
+        ]
+    assert len(raised.value.body) == 10
+    await client.close()
+
+
 def test_sync_stream_transport_error_is_sdk_error() -> None:
     transport = httpx.MockTransport(
         lambda request: httpx.Response(

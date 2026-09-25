@@ -37,6 +37,17 @@ def test_create_request_constraints() -> None:
         CreateResponseRequest(model="m", top_logprobs=21)
 
 
+@pytest.mark.parametrize("field", ["include", "truncation", "service_tier"])
+def test_create_request_rejects_explicit_null_for_non_nullable_fields(field: str) -> None:
+    with pytest.raises(ValidationError):
+        CreateResponseRequest(model="m", **{field: None})
+
+
+def test_create_request_omits_unspecified_non_nullable_fields() -> None:
+    request = CreateResponseRequest(model="m")
+    assert request.model_dump(exclude_unset=True) == {"model": "m"}
+
+
 def test_websocket_rejects_http_fields() -> None:
     assert WebSocketResponseCreateRequest(model="m").type == "response.create"
     with pytest.raises(ValidationError):

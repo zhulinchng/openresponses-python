@@ -21,7 +21,8 @@ from openresponses import AsyncOpenResponses, OpenResponses
 
 `responses.create(request, *, extra_headers=None, timeout=None)` accepts a `CreateResponseRequest` or a mapping and returns:
 
-- `ResponseResource` for JSON responses;
+- `ResponseResource` for strict JSON responses;
+- `OpenAICompatibleResponse` when `response_compatibility="openai-compatible"` accepts a partial provider response;
 - `ResponseStream` or `AsyncResponseStream` when `stream=True`.
 
 `responses.compact(request, *, extra_headers=None, timeout=None)` returns `CompactResource`. The base URL is normalized and the SDK appends `/responses` and `/responses/compact`.

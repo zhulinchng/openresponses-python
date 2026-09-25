@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
+
+import tomllib
 
 
 def test_public_imports() -> None:
@@ -17,8 +20,16 @@ def test_public_imports() -> None:
         "ResponseOutputTextDeltaStreamingEvent",
         "UnknownStreamingEvent",
         "OpenResponsesError",
+        "BadRequestError",
+        "ModelError",
     ]:
         assert hasattr(module, name), name
+
+
+def test_package_and_runtime_versions_match() -> None:
+    module = importlib.import_module("openresponses")
+    project = tomllib.loads(Path("pyproject.toml").read_text())
+    assert module.__version__ == project["project"]["version"]
 
 
 def test_generated_event_literals_are_exported() -> None:

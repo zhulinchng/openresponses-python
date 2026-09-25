@@ -7,7 +7,7 @@ import httpx
 
 from .config import ClientConfig
 from .errors import APIConnectionError, APITimeoutError
-from .serialization import parse_json_response, request_json, status_error
+from .serialization import OpenAICompatibleResponse, parse_json_response, request_json, status_error
 from .streaming import AsyncResponseStream, ResponseStream
 from .types.generated import CompactResource, ResponseResource
 from .types.protocol import CompactResponseRequest, CreateResponseRequest
@@ -38,7 +38,7 @@ class Responses(_Payloads):
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ResponseResource | ResponseStream:
+    ) -> ResponseResource | OpenAICompatibleResponse | ResponseStream:
         payload = self._payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
@@ -53,6 +53,7 @@ class Responses(_Payloads):
                     timeout=request_timeout,
                 ),
                 self._config.response_compatibility,
+                max_response_bytes=self._config.max_response_bytes,
             )
         try:
             response = self._client.post(
@@ -67,7 +68,10 @@ class Responses(_Payloads):
             raise APIConnectionError("request failed") from exc
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
-        return cast(ResponseResource, parse_json_response(response, ResponseResource, self._config))
+        return cast(
+            ResponseResource | OpenAICompatibleResponse,
+            parse_json_response(response, ResponseResource, self._config),
+        )
 
     def compact(
         self,
@@ -107,7 +111,7 @@ class AsyncResponses(_Payloads):
         *,
         extra_headers: Mapping[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ResponseResource | AsyncResponseStream:
+    ) -> ResponseResource | OpenAICompatibleResponse | AsyncResponseStream:
         payload = self._payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
@@ -122,6 +126,7 @@ class AsyncResponses(_Payloads):
                     timeout=request_timeout,
                 ),
                 self._config.response_compatibility,
+                max_response_bytes=self._config.max_response_bytes,
             )
         try:
             response = await self._client.post(
@@ -136,7 +141,10 @@ class AsyncResponses(_Payloads):
             raise APIConnectionError("request failed") from exc
         if not 200 <= response.status_code < 300:
             raise status_error(response, self._config.max_response_bytes)
-        return cast(ResponseResource, parse_json_response(response, ResponseResource, self._config))
+        return cast(
+            ResponseResource | OpenAICompatibleResponse,
+            parse_json_response(response, ResponseResource, self._config),
+        )
 
     async def compact(
         self,

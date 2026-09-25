@@ -81,6 +81,26 @@ def test_sse_parser_dispatches_done_as_data() -> None:
     assert parsed[0].data == "[DONE]"
 
 
+def test_sse_parser_preserves_split_utf8_character() -> None:
+    parser = SSEParser()
+    assert parser.feed(b"data: \xe2\x82") == []
+    parsed = parser.feed(b"\xac\n\n")
+    assert parsed[0].data == "€"
+
+
+def test_sse_parser_translates_invalid_utf8_from_feed() -> None:
+    parser = SSEParser()
+    with pytest.raises(SSEProtocolError, match="not valid UTF-8"):
+        parser.feed(b"data: \xff\n\n")
+
+
+def test_sse_parser_translates_incomplete_utf8_from_finish() -> None:
+    parser = SSEParser()
+    assert parser.feed(b"data: \xe2\x82") == []
+    with pytest.raises(SSEProtocolError, match="not valid UTF-8"):
+        parser.finish()
+
+
 def test_stream_emits_typed_events() -> None:
     created = {
         "type": "response.created",
@@ -145,5 +165,61 @@ def test_stream_rejects_missing_done() -> None:
     )
     client = OpenResponses(base_url="http://test", http_client=httpx.Client(transport=transport))
     with pytest.raises(SSEProtocolError):
+        list(client.responses.create(CreateResponseRequest(model="m", stream=True)))
+    client.close()
+
+
+def test_stream_rejects_duplicate_output_item_done() -> None:
+    body = b"".join(
+        sse(
+            {
+                "type": "response.output_item.done",
+                "sequence_number": sequence,
+                "output_index": 0,
+                "item": None,
+            }
+        )
+        for sequence in (0, 1)
+    ) + sse(
+        {
+            "type": "response.completed",
+            "sequence_number": 2,
+            "response": response_payload(),
+        },
+        done=True,
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=body
+        )
+    )
+    client = OpenResponses(base_url="http://test", http_client=httpx.Client(transport=transport))
+    with pytest.raises(SSEProtocolError, match="completed more than once"):
+        list(client.responses.create(CreateResponseRequest(model="m", stream=True)))
+    client.close()
+
+
+def test_stream_rejects_error_before_non_failed_terminal() -> None:
+    body = sse(
+        {
+            "type": "error",
+            "sequence_number": 0,
+            "error": {"type": "server_error", "code": "failed", "message": "failed", "param": None},
+        }
+    ) + sse(
+        {
+            "type": "response.completed",
+            "sequence_number": 1,
+            "response": response_payload(),
+        },
+        done=True,
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=body
+        )
+    )
+    client = OpenResponses(base_url="http://test", http_client=httpx.Client(transport=transport))
+    with pytest.raises(SSEProtocolError, match="response.failed"):
         list(client.responses.create(CreateResponseRequest(model="m", stream=True)))
     client.close()

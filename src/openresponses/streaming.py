@@ -41,7 +41,10 @@ class SSEParser:
         self._pending_cr = False
 
     def feed(self, chunk: bytes) -> list[ParsedSSEEvent]:
-        decoded = self._decoder.decode(chunk, final=False)
+        try:
+            decoded = self._decoder.decode(chunk, final=False)
+        except UnicodeDecodeError as exc:
+            raise SSEProtocolError("SSE stream is not valid UTF-8") from exc
         if self._pending_cr:
             decoded = "\r" + decoded
             self._pending_cr = False
@@ -52,7 +55,10 @@ class SSEParser:
         return self._drain(final=False)
 
     def finish(self) -> list[ParsedSSEEvent]:
-        decoded = self._decoder.decode(b"", final=True)
+        try:
+            decoded = self._decoder.decode(b"", final=True)
+        except UnicodeDecodeError as exc:
+            raise SSEProtocolError("SSE stream is not valid UTF-8") from exc
         if self._pending_cr:
             decoded = "\r" + decoded
             self._pending_cr = False
@@ -111,21 +117,51 @@ class StreamState:
     saw_error: bool = False
     item_done: set[int] = field(default_factory=set)
     content_done: set[tuple[int, int]] = field(default_factory=set)
+    item_added: set[int] = field(default_factory=set)
+    content_added: set[tuple[int, int]] = field(default_factory=set)
+    error_pending: bool = False
 
     def accept(self, event: Any) -> Any:
+        if self.terminal_seen:
+            raise SSEProtocolError("event received after terminal response event")
         sequence = getattr(event, "sequence_number", None)
         if sequence is not None:
             if self.last_sequence_number is not None and sequence <= self.last_sequence_number:
                 raise SSEProtocolError("event sequence_number must strictly increase")
             self.last_sequence_number = sequence
         event_type = event.type
-        if self.terminal_seen:
-            raise SSEProtocolError("event received after terminal response event")
-        if event_type == "response.output_item.done":
+        if self.error_pending and event_type != "response.failed":
+            raise SSEProtocolError("error event must be followed by response.failed")
+        output_index = getattr(event, "output_index", None)
+        if (
+            output_index is not None
+            and output_index in self.item_done
+            and event_type != "response.output_item.done"
+        ):
+            raise SSEProtocolError("output item received updates after completion")
+        content_index = getattr(event, "content_index", None)
+        content_key = (
+            (output_index, content_index)
+            if output_index is not None and content_index is not None
+            else None
+        )
+        if content_key is not None and content_key in self.content_done:
+            raise SSEProtocolError("content part received updates after completion")
+        if event_type == "response.output_item.added":
+            index = event.output_index
+            if index in self.item_added or index in self.item_done:
+                raise SSEProtocolError("output item was added more than once")
+            self.item_added.add(index)
+        elif event_type == "response.output_item.done":
             index = event.output_index
             if index in self.item_done:
                 raise SSEProtocolError("output item was completed more than once")
             self.item_done.add(index)
+        elif event_type == "response.content_part.added":
+            key = (event.output_index, event.content_index)
+            if key in self.content_added or key in self.content_done:
+                raise SSEProtocolError("content part was added more than once")
+            self.content_added.add(key)
         elif event_type == "response.content_part.done":
             key = (event.output_index, event.content_index)
             if key in self.content_done:
@@ -133,11 +169,11 @@ class StreamState:
             self.content_done.add(key)
         elif event_type == "error":
             self.saw_error = True
+            self.error_pending = True
         elif event_type in {"response.completed", "response.failed", "response.incomplete"}:
             self.terminal_seen = True
             self.final_response = event.response
-            if self.saw_error and event_type != "response.failed":
-                raise SSEProtocolError("error event must be followed by response.failed")
+            self.error_pending = False
         return event
 
 
@@ -169,6 +205,7 @@ def _compatible_response_payload(value: Any) -> dict[str, Any]:
     response.setdefault("completed_at", None)
     response.setdefault("status", "in_progress")
     response.setdefault("incomplete_details", None)
+    response.setdefault("model", "unknown")
     response.setdefault("previous_response_id", None)
     response.setdefault("instructions", None)
     response.setdefault("output", [])
@@ -196,7 +233,11 @@ def _compatible_response_payload(value: Any) -> dict[str, Any]:
     return response
 
 
-def _decode_event(parsed: ParsedSSEEvent, response_compatibility: str = "strict") -> Any:
+def _decode_event(
+    parsed: ParsedSSEEvent,
+    response_compatibility: str = "strict",
+    synthesized_sequence_number: int | None = None,
+) -> Any:
     if parsed.data.strip() == "[DONE]":
         return None
     try:
@@ -207,6 +248,17 @@ def _decode_event(parsed: ParsedSSEEvent, response_compatibility: str = "strict"
         raise SSEProtocolError("SSE event payload requires a string type")
     if parsed.event is not None and parsed.event != payload["type"]:
         raise SSEProtocolError("SSE event name does not match payload type")
+    if (
+        response_compatibility == "openai-compatible"
+        and "sequence_number" not in payload
+        and synthesized_sequence_number is not None
+    ):
+        payload = {**payload, "sequence_number": synthesized_sequence_number}
+    if response_compatibility == "openai-compatible" and payload.get("type") in {
+        "response.output_item.added",
+        "response.output_item.done",
+    }:
+        payload = {"output_index": 0, **payload}
     if response_compatibility == "openai-compatible" and "response" in payload:
         try:
             payload = {**payload, "response": _compatible_response_payload(payload["response"])}
@@ -219,9 +271,15 @@ def _decode_event(parsed: ParsedSSEEvent, response_compatibility: str = "strict"
 
 
 class _StreamBase:
-    def __init__(self, stream_context: Any, response_compatibility: str = "strict") -> None:
+    def __init__(
+        self,
+        stream_context: Any,
+        response_compatibility: str = "strict",
+        max_response_bytes: int = 16 * 1024 * 1024,
+    ) -> None:
         self._stream_context = stream_context
         self._response_compatibility = response_compatibility
+        self._max_response_bytes = max_response_bytes
         self._response_context: Any = None
         self._state = StreamState()
         self._closed = False
@@ -248,7 +306,16 @@ class _StreamBase:
                 raise SSEProtocolError("[DONE] received before a terminal response event")
             self._finished = True
             return None
-        return self._state.accept(_decode_event(parsed, self._response_compatibility))
+        next_sequence_number = (
+            0 if self._state.last_sequence_number is None else self._state.last_sequence_number + 1
+        )
+        return self._state.accept(
+            _decode_event(
+                parsed,
+                self._response_compatibility,
+                next_sequence_number,
+            )
+        )
 
     def _finish_check(self) -> None:
         if self._response_compatibility == "openai-compatible" and self._state.terminal_seen:
@@ -273,7 +340,9 @@ class ResponseStream(_StreamBase, Iterator[Any]):
                 response.read()
                 from .serialization import status_error
 
-                raise status_error(response, request=self._response_context.request)
+                raise status_error(
+                    response, self._max_response_bytes, request=self._response_context.request
+                )
             content_type = self._response_context.headers.get("content-type", "")
             if "text/event-stream" not in content_type.lower():
                 raise SSEProtocolError("streaming response must use text/event-stream")
@@ -342,7 +411,11 @@ class AsyncResponseStream(_StreamBase, AsyncIterator[Any]):
                 await self._response_context.aread()
                 from .serialization import status_error
 
-                raise status_error(self._response_context, request=self._response_context.request)
+                raise status_error(
+                    self._response_context,
+                    self._max_response_bytes,
+                    request=self._response_context.request,
+                )
             content_type = self._response_context.headers.get("content-type", "")
             if "text/event-stream" not in content_type.lower():
                 raise SSEProtocolError("streaming response must use text/event-stream")

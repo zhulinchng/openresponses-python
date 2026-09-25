@@ -14,7 +14,7 @@ The package is published from GitHub Actions using PyPI Trusted Publishing (OIDC
 
 ## Release
 
-1. Update `project.version` in `pyproject.toml` and `__version__` in `src/openresponses/__init__.py` together.
+1. Update `project.version` in `pyproject.toml` and `__version__` in `src/openresponses/__init__.py` together; the release workflow rejects mismatches.
 2. Update the changelog/release notes if applicable.
 3. Run the local release checks:
 
@@ -30,7 +30,7 @@ The package is published from GitHub Actions using PyPI Trusted Publishing (OIDC
    ```
 
 4. Commit and push the release changes to `main`.
-5. Create and publish a GitHub release using the same version, for example `v0.1.0`.
+5. Create and publish a GitHub release using the matching `v<project.version>` tag.
 6. The `Publish Python package` workflow builds, tests, validates, and publishes the sdist and wheel to PyPI.
 
 The workflow also supports manual dispatch, but a published GitHub release is the normal release trigger.
