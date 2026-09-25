@@ -1,0 +1,118 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openresponses"
+version = "0.1.0"
+description = "Typed Python SDK for the OpenResponses protocol"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "OpenResponses Python contributors" }]
+keywords = ["openresponses", "openai", "responses", "llm", "sdk", "asgi"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+
+dependencies = [
+  "httpx>=0.28,<1",
+  "pydantic>=2.12,<3",
+  "websockets>=15,<17",
+]
+
+[project.urls]
+Homepage = "https://github.com/zhulinchng/openresponses-python"
+Repository = "https://github.com/zhulinchng/openresponses-python"
+Issues = "https://github.com/zhulinchng/openresponses-python/issues"
+Documentation = "https://github.com/zhulinchng/openresponses-python/tree/main/docs"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2,<2",
+  "datamodel-code-generator==0.83.0",
+  "hypothesis>=6.135",
+  "jsonschema>=4.25,<5",
+  "mypy>=1.17",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.1",
+  "pytest-cov>=7.0",
+  "ruff>=0.12",
+  "twine>=6.1,<7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openresponses"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"openresponses/openapi/2026-04-24.json" = "openresponses/openapi/2026-04-24.json"
+"openresponses/VERSION" = "openresponses/VERSION"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/openresponses",
+  "/docs",
+  "/examples",
+  "/scripts",
+  "/tests",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+  "/RELEASING.md",
+]
+exclude = [
+  "/.coverage",
+  "/.mypy_cache",
+  "/.pytest_cache",
+  "/.ruff_cache",
+  "**/__pycache__",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = ["live: opt-in provider conformance tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["src/openresponses/types/generated.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+ignore = ["E501"]
+[tool.ruff.lint.per-file-ignores]
+"src/openresponses/types/__init__.py" = ["E402", "F401"]
+[tool.mypy]
+python_version = "3.10"
+strict = true
+plugins = ["pydantic.mypy"]
+[tool.coverage.run]
+source = ["src/openresponses"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[[tool.mypy.overrides]]
+module = ["websockets.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["openresponses.types.generated"]
+ignore_errors = true
