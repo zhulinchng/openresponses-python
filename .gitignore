@@ -23,6 +23,8 @@ dist/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
+# Generated documentation site
+site/
 __pypackages__/
 
 # Local configuration and secrets

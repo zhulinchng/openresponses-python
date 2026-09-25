@@ -36,7 +36,7 @@ dependencies = [
 Homepage = "https://github.com/zhulinchng/openresponses-python"
 Repository = "https://github.com/zhulinchng/openresponses-python"
 Issues = "https://github.com/zhulinchng/openresponses-python/issues"
-Documentation = "https://github.com/zhulinchng/openresponses-python/tree/main/docs"
+Documentation = "https://zhulinchng.github.io/openresponses-python/"
 
 [project.optional-dependencies]
 dev = [
@@ -50,6 +50,9 @@ dev = [
   "pytest-cov>=7.0",
   "ruff>=0.12",
   "twine>=6.1,<7",
+  "mkdocs>=1.6,<2",
+  "mkdocs-material>=9.7,<10",
+  "mkdocs-mermaid2-plugin>=1.2,<2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -66,7 +69,8 @@ include = [
   "/docs",
   "/examples",
   "/scripts",
-  "/tests",
+  "/RELEASING.md",
+  "/mkdocs.yml",
   "/README.md",
   "/LICENSE",
   "/pyproject.toml",

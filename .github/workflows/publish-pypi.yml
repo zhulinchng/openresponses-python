@@ -36,6 +36,7 @@ jobs:
           python -m ruff check src/openresponses tests examples scripts
           python -m ruff format --check src/openresponses tests examples scripts
           python scripts/generate_models.py --check
+          python -m mkdocs build --strict
 
       - name: Build source and wheel distributions
         run: python -m build --sdist --wheel --outdir dist/

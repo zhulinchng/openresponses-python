@@ -26,6 +26,7 @@ The package is published from GitHub Actions using PyPI Trusted Publishing (OIDC
    python scripts/generate_models.py --check
    python -m build --sdist --wheel --outdir dist/
    python -m twine check dist/*
+   python -m mkdocs build --strict
    ```
 
 4. Commit and push the release changes to `main`.

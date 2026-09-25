@@ -55,6 +55,17 @@ weather = FunctionToolParam(
 
 ## Function-call continuation
 
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant P as Provider
+    A->>P: CreateResponseRequest with tools
+    P-->>A: function_call item
+    A->>A: Validate and execute approved code
+    A->>P: function_call_output with call_id
+    P-->>A: Next response
+```
+
 A function call is a protocol result, not an SDK-fulfilled action. To continue:
 
 1. Declare tools in the create request.

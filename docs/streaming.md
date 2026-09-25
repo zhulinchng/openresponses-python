@@ -29,6 +29,20 @@ async with stream:
 
 ## Typed lifecycle
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant P as Provider
+    C->>P: POST /responses (stream=true)
+    P-->>C: response.created
+    P-->>C: output item / content events
+    P-->>C: output text deltas
+    P-->>C: response.output_item.done
+    P-->>C: response.completed
+    P-->>C: [DONE]
+    C->>C: Validate, sequence-check, close
+```
+
 Each yielded standard value is a `Response*StreamingEvent` model. A typical completed lifecycle is:
 
 1. `response.created`;
@@ -37,7 +51,6 @@ Each yielded standard value is a `Response*StreamingEvent` model. A typical comp
 4. matching `.done` events and `response.output_item.done`;
 5. exactly one terminal event: `response.completed`, `response.failed`, or `response.incomplete`;
 6. the SSE sentinel `data: [DONE]`.
-
 `[DONE]` is transport framing, not a protocol event, and is never yielded. `response.failed` and `response.incomplete` are valid typed terminal results. An earlier `error` event must be followed by `response.failed`.
 
 After normal exhaustion, inspect:

@@ -125,12 +125,10 @@ Models preserve unknown extension fields and serialize them with `model_dump(mod
 
 For Ollama, vLLM, llama.cpp, LM Studio, SGLang, and other partial OpenAI-compatible runtimes, see [provider compatibility](docs/compatibility.md). Compatibility mode is explicit and preserves strict OpenResponses validation by default.
 
-## Documentation and examples
+## Documentation
 
-- [Quickstart](docs/quickstart.md)
-- [Typed protocol models](docs/protocol.md)
-- [SSE streaming](docs/streaming.md)
-- [WebSocket turns](docs/websocket.md)
-- Runnable-style programs in [`examples/`](examples/)
+Read the hosted documentation at [openresponses-python.readthedocs](https://zhulinchng.github.io/openresponses-python/) or locally with `python -m mkdocs serve`.
+
+The site covers the [quickstart](docs/quickstart.md), [typed protocol models](docs/protocol.md), [SSE streaming](docs/streaming.md), [WebSocket turns](docs/websocket.md), and [provider compatibility](docs/compatibility.md). Runnable examples live in [`examples/`](examples/).
 
 The package includes the pinned schema at `openresponses/openapi/2026-04-24.json`. Compatibility is for that dated release; later protocol versions require an explicit SDK/model update.

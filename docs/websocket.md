@@ -31,6 +31,19 @@ async with AsyncOpenResponses() as client, client.websocket() as websocket:
 
 ## Sequential turns
 
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant W as WebSocket
+    participant P as Provider
+    A->>W: response.create
+    W->>P: one in-flight turn
+    P-->>W: response.created and deltas
+    P-->>W: terminal response or error
+    W-->>A: typed turn result
+    A->>W: next response.create
+```
+
 A connection permits one in-flight turn. Calling `create` again before the first turn reaches a terminal response or typed error raises `WebSocketError`. After iteration ends, inspect `turn.error` and `turn.final_response`, then create the next turn:
 
 ```python
