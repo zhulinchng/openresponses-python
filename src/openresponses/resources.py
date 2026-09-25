@@ -37,19 +37,30 @@ class Responses(_Payloads):
         request: CreateResponseRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> ResponseResource | ResponseStream:
         payload = self._payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
+        request_timeout = self._config.timeout if timeout is None else timeout
         if payload.get("stream"):
             return ResponseStream(
                 self._client.stream(
-                    "POST", self._config.responses_url, json=payload, headers=headers
+                    "POST",
+                    self._config.responses_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=request_timeout,
                 ),
                 self._config.response_compatibility,
             )
         try:
-            response = self._client.post(self._config.responses_url, json=payload, headers=headers)
+            response = self._client.post(
+                self._config.responses_url,
+                json=payload,
+                headers=headers,
+                timeout=request_timeout,
+            )
         except httpx.TimeoutException as exc:
             raise APITimeoutError("request timed out") from exc
         except httpx.HTTPError as exc:
@@ -63,12 +74,19 @@ class Responses(_Payloads):
         request: CompactResponseRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> CompactResource:
         payload = self._compact_payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
+        request_timeout = self._config.timeout if timeout is None else timeout
         try:
-            response = self._client.post(self._config.compact_url, json=payload, headers=headers)
+            response = self._client.post(
+                self._config.compact_url,
+                json=payload,
+                headers=headers,
+                timeout=request_timeout,
+            )
         except httpx.TimeoutException as exc:
             raise APITimeoutError("request timed out") from exc
         except httpx.HTTPError as exc:
@@ -88,20 +106,29 @@ class AsyncResponses(_Payloads):
         request: CreateResponseRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> ResponseResource | AsyncResponseStream:
         payload = self._payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
+        request_timeout = self._config.timeout if timeout is None else timeout
         if payload.get("stream"):
             return AsyncResponseStream(
                 self._client.stream(
-                    "POST", self._config.responses_url, json=payload, headers=headers
+                    "POST",
+                    self._config.responses_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=request_timeout,
                 ),
                 self._config.response_compatibility,
             )
         try:
             response = await self._client.post(
-                self._config.responses_url, json=payload, headers=headers
+                self._config.responses_url,
+                json=payload,
+                headers=headers,
+                timeout=request_timeout,
             )
         except httpx.TimeoutException as exc:
             raise APITimeoutError("request timed out") from exc
@@ -116,13 +143,18 @@ class AsyncResponses(_Payloads):
         request: CompactResponseRequest | Mapping[str, Any],
         *,
         extra_headers: Mapping[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> CompactResource:
         payload = self._compact_payload(request)
         headers = self._config.headers(dict(extra_headers or {}))
         headers["Content-Type"] = "application/json"
+        request_timeout = self._config.timeout if timeout is None else timeout
         try:
             response = await self._client.post(
-                self._config.compact_url, json=payload, headers=headers
+                self._config.compact_url,
+                json=payload,
+                headers=headers,
+                timeout=request_timeout,
             )
         except httpx.TimeoutException as exc:
             raise APITimeoutError("request timed out") from exc

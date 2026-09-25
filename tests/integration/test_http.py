@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from openresponses.client import OpenResponses
-from openresponses.errors import AuthenticationError
+from openresponses.errors import AuthenticationError, BadRequestError, ModelError
 from openresponses.types import CreateResponseRequest
 
 
@@ -75,6 +75,43 @@ def test_json_error_mapping() -> None:
     with pytest.raises(AuthenticationError):
         client.responses.create({"model": "m"})
     client.close()
+
+
+def test_json_create_timeout_override() -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json=response_payload())
+
+    client = OpenResponses(
+        base_url="http://test",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    client.responses.create({"model": "m"}, timeout=3.5)
+    assert captured[0].extensions["timeout"] == {
+        "connect": 3.5,
+        "read": 3.5,
+        "write": 3.5,
+        "pool": 3.5,
+    }
+    client.close()
+
+
+def test_error_mapping_includes_bad_request_and_model_errors() -> None:
+    for status, payload, expected in [
+        (400, {"error": {"message": "bad request"}}, BadRequestError),
+        (500, {"error": {"type": "model_error", "message": "model failed"}}, ModelError),
+    ]:
+        transport = httpx.MockTransport(
+            lambda request, status=status, payload=payload: httpx.Response(status, json=payload)
+        )
+        client = OpenResponses(
+            base_url="http://test", http_client=httpx.Client(transport=transport)
+        )
+        with pytest.raises(expected):
+            client.responses.create({"model": "m"})
+        client.close()
 
 
 def test_compact_requires_json() -> None:

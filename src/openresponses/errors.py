@@ -56,6 +56,18 @@ class InternalServerError(APIStatusError):
     pass
 
 
+class BadRequestError(APIStatusError):
+    """The provider rejected the request as invalid."""
+
+    pass
+
+
+class ModelError(APIStatusError):
+    """The provider could not execute the requested model."""
+
+    pass
+
+
 class APIResponseValidationError(OpenResponsesError):
     """The provider response did not conform to the pinned OpenAPI model."""
 

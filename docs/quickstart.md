@@ -10,7 +10,7 @@ python -m pip install -e .
 
 ## Configure a client
 
-`OpenResponses` accepts a base URL, optional API key, timeout, default headers, and custom authentication scheme. The HTTP base URL normally ends in the provider's API version, such as `https://api.openai.com/v1`; the SDK appends `/responses` and `/responses/compact`. The key is optional for local and private providers.
+`OpenResponses` accepts a base URL, optional API key, default timeout, default headers, and custom authentication scheme. The HTTP base URL normally ends in the provider's API version, such as `https://api.openai.com/v1`; the SDK appends `/responses` and `/responses/compact`. The key is optional for local and private providers. Pass `timeout=` to `responses.create(...)` or `responses.compact(...)` to override the client timeout for one operation.
 
 ```python
 import os
@@ -26,7 +26,7 @@ client = OpenResponses(
 
 A key is sent as `Authorization: Bearer …` by default. Set `auth_header` and `auth_prefix=None` when a provider expects a different header or no prefix. Per-call `extra_headers` are merged without changing the defaults.
 
-Clients created by the SDK own and close their HTTP transport. An injected `http_client` remains caller-owned. Use the context manager to close SDK-owned clients.
+Clients created by the SDK own and close their HTTP transport. An injected `http_client` remains caller-owned. Use the context manager to close SDK-owned clients. HTTP 400 responses raise `BadRequestError`; 401, 403, 404, and 429 map to `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, and `RateLimitError`; provider `model_error` responses map to `ModelError`, and other 5xx responses map to `InternalServerError`.
 
 ## Create a JSON response
 

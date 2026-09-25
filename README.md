@@ -115,7 +115,7 @@ The SDK is a protocol client, not an agent runner. It returns `function_call` it
 
 ## Errors and retries
 
-All SDK exceptions derive from `OpenResponsesError`. HTTP failures retain the status, raw body, headers, request URL, and parsed provider error where available. Common subclasses include `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, `RateLimitError`, `InternalServerError`, `APIConnectionError`, and `APITimeoutError`. Invalid success payloads and malformed event streams raise validation or protocol errors.
+All SDK exceptions derive from `OpenResponsesError`. HTTP failures retain the status, raw body, headers, request URL, and parsed provider error where available. Common subclasses include `BadRequestError`, `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, `RateLimitError`, `ModelError`, `InternalServerError`, `APIConnectionError`, and `APITimeoutError`. Invalid success payloads and malformed event streams raise validation or protocol errors. Each operation also accepts a per-call `timeout` override.
 
 The SDK performs **no automatic retries**. Response creation can bill or execute work and the protocol has no universal idempotency key. Retry only when your application understands duplicate-work risk and provider semantics.
 

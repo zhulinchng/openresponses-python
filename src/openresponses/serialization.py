@@ -12,7 +12,9 @@ from .errors import (
     APIResponseValidationError,
     APIStatusError,
     AuthenticationError,
+    BadRequestError,
     InternalServerError,
+    ModelError,
     NotFoundError,
     PermissionDeniedError,
     RateLimitError,
@@ -138,6 +140,8 @@ def status_error(
         ),
         "error": error,
     }
+    if status == 400:
+        return BadRequestError(message, **common)
     if status == 401:
         return AuthenticationError(message, **common)
     if status == 403:
@@ -147,6 +151,9 @@ def status_error(
     if status == 429:
         return RateLimitError(message, **common)
     if status >= 500:
+        error_type = error.get("type") if isinstance(error, dict) else None
+        if error_type == "model_error":
+            return ModelError(message, **common)
         return InternalServerError(message, **common)
     return APIStatusError(message, **common)
 
